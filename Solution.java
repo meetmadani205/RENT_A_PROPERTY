@@ -1,5 +1,5 @@
 import java.util.*;
-import java.util.ArrayList;
+import java.sql.*;
 
 class Property
 {
@@ -31,11 +31,12 @@ class Property
         return PropertyId;
     }
     
-    public double calCulateRent()
+    public String calCulateRent()
     {
-        return rentPerMonth;
+        return rentPerMonth+"";
     }
-    public boolean isAvailable() {
+    public boolean isAvailable() 
+    {
         return isAvailable;
     }
 
@@ -98,203 +99,227 @@ class Rent
 
 class RentProperty 
 {
-    private ArrayList<Property> prop;
-    private ArrayList<Customer> cus;
-    private ArrayList<Rent> rent;
-
+    Connection con = null;
     public RentProperty()
     {
-        prop = new ArrayList<>();
-        cus = new ArrayList<>();
-        rent = new ArrayList<>();
+        try
+        {
+           String url = "jdbc:mysql://localhost:3306/project";
+           String username = "root";
+           String password = "************";
+           con = DriverManager.getConnection(url, username, password);
+        } 
+        catch(Exception e)
+        {
+            e.printStackTrace();
+        }
     }
+    public void addProperty(Property p) throws SQLException
+    {
+        String in = "insert into property(id,type,area,rentpermonth,isavailable) values(?,?,?,?,?)";
+        PreparedStatement ps = con.prepareStatement(in);
 
-    public void addProperty(Property p)
-    {
-        prop.add(p);
+        ps.setString(1, p.getId());
+        ps.setString(2, p.getType());
+        ps.setString(3, p.getArea());
+        ps.setString(4, p.calCulateRent());
+        ps.setString(5, "True");
+       
+        ps.executeUpdate();
     }
-    public void addCustomers(Customer c)
+    public void addCustomers(Customer c) throws SQLException
     {
-        cus.add(c);
+        String q = "select count(*) as cnt from customer where id = "+c.getCustomerId();
+        Statement st = con.createStatement();
+        ResultSet rs = st.executeQuery(q);
+        int a = 0;
+        if(rs.next())
+        {
+           a = rs.getInt(1);
+        }
+        if(a == 1)
+        {
+            System.out.println("This customer has already exist! +id = "+c.getCustomerId());
+            return;
+        }
+        String in = "insert into customer(id,name) values(?,?)";
+        PreparedStatement ps = con.prepareStatement(in);
+
+        ps.setString(1, c.getCustomerId());
+        ps.setString(2, c.getCustomerName());
+       
+        ps.executeUpdate();
     }
-    public void rentProp(Property p,Customer c,int months)
+    public void rentProp(Property p,Customer c,String months) throws SQLException
     {
+        
         if(p.isAvailable())
         {
             p.rent();
-            rent.add(new Rent(p, c, months));
+            String ex = "update property set isavailable = 'False' where id = "+p.getId();
+            PreparedStatement psz = con.prepareStatement(ex);
+            psz.executeUpdate();
+
+            String in = "insert into rent(pid,cid,rentpermonth) values(?,?,?)";
+            PreparedStatement ps = con.prepareStatement(in);
+
+            ps.setString(1, p.getId());
+            ps.setString(2, c.getCustomerId());
+            ps.setString(3, p.calCulateRent());
+       
+            ps.executeUpdate();
+            System.out.println();
+            System.out.println("                -:Confirmation details :- ");
+            System.out.println("Customer Name : "+c.getCustomerName()+" id = "+c.getCustomerId());
+            System.out.println("Proprty type : "+p.getType()+" id = "+p.getId());
+            System.out.println("Address : "+p.getArea());
+            System.out.println("Rent per month = "+p.calCulateRent());
+            System.out.println();
+            System.out.println("Property rented successfully!");
         }
         else
         {
             System.out.println("Property is not available for rent");
         }
     }
-    public void returnBack(Property p)
+    public void returnBack(Property p) throws SQLException
     {
-        Rent delete = null;
-        for(Rent pr : rent)
+        String q = "select count(*) as cnt from rent where pid = "+p.getId();
+        Statement st = con.createStatement();
+        ResultSet rs = st.executeQuery(q);
+        int a = 0;
+
+        if(rs.next())
         {
-            if(pr.getproperty() == p)
-            {
-                delete = pr;
-                break;
-            }
+            a = rs.getInt(1);
         }
-        if(delete != null)
+        
+        if(a == 1)
         {
-            rent.remove(delete);
+            String qu = "DELETE FROM rent WHERE pid = ?";
+            PreparedStatement pstmt = con.prepareStatement(qu);
+            pstmt.setString(1, p.getId());
+
+            pstmt.executeUpdate();
+
+            String ex = "update property set isavailable = 'True' where id = "+p.getId();
+            PreparedStatement psz = con.prepareStatement(ex);
+            psz.executeUpdate();
+            System.out.println("Property returned successfully!");
         }
         else
         {
             System.out.println("Property is not given for rent.");
         }
     }
-
-    public void run()
+    public void run() throws SQLException
     {
+        Property arr[] = Solution.call();
         Scanner sc = new Scanner(System.in);
         int choice = 0;
-
-        while(choice!=3)
+        System.out.println();
+        while(choice != 3)
         {
-            System.out.println("Enter your choice from below options : \n1.Rent a property as per your requirement\n2. return a property\n3.exit from system\n");
+            System.out.println("Enter your choice :\n1.Rent a property\n2.Return a property\n3.exit from system");
             choice = sc.nextInt();
-
             if(choice == 1)
             {
-                 System.out.println("\n\n= = = Rent a Property = = =");
-                         
-                         System.out.println("\nEnter your name please..");
-                         String cname = sc.nextLine();
+                String q = "select id,type,area from property where isavailable = 'True'";
+                Statement st = con.createStatement();
+                ResultSet rs = st.executeQuery(q);
+                System.out.println("id                   "+"Addres                  ");
+                while(rs.next())
+                {
+                    System.out.println(rs.getString(1)+" "+rs.getString(2)+" "+rs.getString(3));
+                }
+                System.out.println();
+                System.out.println("Enter property id you want to rent");
+                String in = sc.next();
 
-                         System.out.println("Rent any below available properties as per your requirement \n");
+                System.out.println("Enter your name : ");
+                String name = sc.next();
 
-                         for(Property p : prop)
-                         {
-                            System.out.println(p.getId() + " - " + p.getType() + " " + p.getArea());
-                         }
-                         System.out.print("\nEnter the Property ID you want to rent: ");
-                         String Id = sc.nextLine();
+                System.out.println("For How many months you need to rent?");
+                String mon = sc.next();
 
-                         System.out.print("Enter the number of months for rental: ");
-                         int rentalMonths = sc.nextInt();
-                         sc.nextLine(); // Consume newline
+                String qe = "select count(*) from customer";
+                Statement st1 = con.createStatement();
+                ResultSet rs1 = st1.executeQuery(qe);
+                int b = 1;
+                if(rs1.next())
+                {
+                    b = rs1.getInt(1);
+                }
+                Customer nc = new Customer(name, (b+1)+"");
+                addCustomers(nc);
 
-                         Customer newCustomer = new Customer("CUS" + (cus.size() + 1), cname);
-                         addCustomers(newCustomer);
-                         Property selected = null;
-                for (Property p : prop) {
-                    if (p.getId().equals(Id) && p.isAvailable()) {
-                        selected = p;
-                        break;
+                String qee = "select count(*) from property where id = "+in;
+                Statement st11 = con.createStatement();
+                ResultSet rs11 = st1.executeQuery(qee);
+                int b1 = 0;
+                if(rs11.next())
+                {
+                    b1 = rs11.getInt(1);
+                }
+                if(b1 == 1)
+                {
+                    String qeee = "select isavailable from property where id = "+in;
+                    Statement st111 = con.createStatement();
+                    ResultSet rs111 = st111.executeQuery(qeee);
+
+                    if(rs111.next() && rs111.getString(1).equalsIgnoreCase("True"))
+                    {
+                        int c = Integer.parseInt(in);
+                        rentProp(arr[c], nc, mon);
+                    }
+                    else
+                    {
+                        System.out.println("Rental canceled!");
                     }
                 }
-                if (selected != null) {
-                    double totalPrice = selected.calCulateRent();
-                    System.out.println("\n== Rental Information ==\n");
-                    System.out.println("Customer ID: " + newCustomer.getCustomerId());
-                    System.out.println("Customer Name: " + newCustomer.getCustomerName());
-                    System.out.println("Property : " + selected.getType() + " " + "Location : "+selected.getArea() + "Property ID : "+selected.getId());
-                    System.out.println("Rental Duration: " + rentalMonths);
-                    System.out.printf("Rent per month : ", totalPrice);
-
-                    System.out.print("\nConfirm rental (Y/N): ");
-                    String confirm = sc.nextLine();
-
-                    if (confirm.equalsIgnoreCase("Y")) {
-                        rentProp(selected, newCustomer, rentalMonths);
-                        System.out.println("\nProperty rented successfully.");
-                    } else {
-                        System.out.println("\nRental canceled.");
-                    }
-                } else {
-                    System.out.println("\nInvalid Property selection or this property is not available for rent.");
-                }  
-            }      
+                else
+                {
+                    System.out.println("Rental canceled!!");
+                }
+            }
             else if(choice == 2)
             {
-            System.out.println("\n== Return a Property ==\n");
-            System.out.print("Enter the car ID you want to return: ");
-            String PoId = sc.nextLine();
-
-            Property ppToReturn = null;
-            for (Property p : prop) {
-                if (p.getId().equals(PoId) && !p.isAvailable()) {
-                    ppToReturn = p;
-                    break;
-                }
+                System.out.println("Enter property id you want to return");
+                String in = sc.next();
+                int c = Integer.parseInt(in);
+                returnBack(arr[c]);
             }
-
-            if (ppToReturn != null) {
-                Customer customer = null;
-                for (Rent rental : rent) {
-                    if (rental.getproperty() == ppToReturn) {
-                        customer = rental.getCustomer();
-                        break;
-                    }
-                }
-
-                if (customer != null) {
-                    returnBack(ppToReturn);
-                    System.out.println("Car returned successfully by " + customer.getCustomerName());
-                }
-            }
-                else {
-                    System.out.println("Car was not rented or rental information is missing.");
-                }
-            } 
-            else if(choice == 3)
-            {
-                break;
-            }
-            else{
-                System.out.println("Invalid car ID or car is not rented.");
-            }
-                
-            }
-            System.out.println("Thankyou for rent your property with us ! ");
         }
     }
-
-
+}
 public class Solution 
 {
-    public static void main(String args[])
-    {
-        Scanner sc = new Scanner(System.in);
-
-        System.out.println("\n ==== Welcome to Property Rental System !! ====");
-
+      static Property arr[] = new Property[11];
+      public static void main(String args[]) throws SQLException
+      {
         RentProperty rp = new RentProperty();
         
-        Property f1 = new Property("Flat 4-BHK (1000 sq.ft)", "f1", "Near kalawad road, kotecha chowk,Rajkot", 30000);
-        Property f2 = new Property("Flat 2-BHK (650 sq.ft)", "f2", "Near ayodhya chowk,150 feet ring road,Rajkot", 12000);
-        Property f3 = new Property("Flat 1-BHK (500 sq.ft)", "f3", "Near Bapasitaram chowk,mavdi main road,Rajkot", 8000);
-
-        Property b1 = new Property("Bunglow 1-BHK (800 sq.fit,Total floor = 1)", "b1", "Near panchayat chowk , University road,Rajkot", 8000);
-        Property b2 = new Property("Bunglow 2-BHK (1000 sq.fit,total floor = 2)", "b2", "Near shital park,150 feet ring road,Rajkot", 10000);
-        Property b3 = new Property("Bunglow 1-BHK (1200 sq.fit,total floor = 3)", "b3", "Near crystal mall,kalawad road,Rajkot", 15000);
-
-        Property s1 = new Property("Shop/Show-room (300 sq.ft)", "s1", "Near, Madhapar chowk,150 feet ring road,Rajkot", 30000); 
-        Property s2 = new Property("Shop/Small shop (200 sq.ft)", "s2", "Near, Gondal chowk,150 feet ring road,Rajkot", 15000); 
-        Property s3 = new Property("Shop/large shop(225 sq.ft)", "s3", "Near, West zone office,150 feet ring road,Rajkot", 25000); 
-
-        Property o1 = new Property("Office/Corporate office(900 sq.ft)", "o1", "Near Nana mava circle,150 feet ring road,Rajkot", 50000);
-        Property o2 = new Property("Office(500 sq.ft)", "o2", "Raiya telephone exchange,150 feet ring road,Rajkot", 40000);
-
-        rp.addProperty(f1);
-        rp.addProperty(f2);
-        rp.addProperty(f3);
-        rp.addProperty(b1);
-        rp.addProperty(b2);
-        rp.addProperty(b3);
-        rp.addProperty(s1);
-        rp.addProperty(s2);
-        rp.addProperty(s3);
-        rp.addProperty(o1);
-        rp.addProperty(o2);
-
-        rp.run();
         
-    }
+        arr[0] = new Property("Flat 4-BHK (1000 sq.ft)", "0", "Near kalawad road, kotecha chowk,Rajkot", 30000);
+        arr[1] = new Property("Flat 2-BHK (650 sq.ft)", "1", "Near ayodhya chowk,150 feet ring road,Rajkot", 12000);
+        arr[2] = new Property("Flat 1-BHK (500 sq.ft)", "2", "Near Bapasitaram chowk,mavdi main road,Rajkot", 8000);
+        arr[3] = new Property("Bunglow 1-BHK (800 sq.fit,Total floor = 1)", "3", "Near panchayat chowk , University road,Rajkot", 8000);
+        arr[4] = new Property("Bunglow 2-BHK (1000 sq.fit,total floor = 2)", "4", "Near shital park,150 feet ring road,Rajkot", 10000);
+        arr[5] = new Property("Bunglow 1-BHK (1200 sq.fit,total floor = 3)", "5", "Near crystal mall,kalawad road,Rajkot", 15000);
+        arr[6] = new Property("Shop/Show-room (300 sq.ft)", "6", "Near, Madhapar chowk,150 feet ring road,Rajkot", 30000); 
+        arr[7] = new Property("Shop/Small shop (200 sq.ft)", "7", "Near, Gondal chowk,150 feet ring road,Rajkot", 15000); 
+        arr[8] = new Property("Shop/large shop(225 sq.ft)", "8", "Near, West zone office,150 feet ring road,Rajkot", 25000); 
+        arr[9] = new Property("Office/Corporate office(900 sq.ft)", "9", "Near Nana mava circle,150 feet ring road,Rajkot", 50000);
+        arr[10] = new Property("Office(500 sq.ft)", "10", "Raiya telephone exchange,150 feet ring road,Rajkot", 40000);
+
+        for(Property p : arr)
+        {
+            rp.addProperty(p);
+        }
+        rp.run();
+      }
+      public static Property[] call()
+        {
+            return arr;
+        }
 }
